@@ -1,0 +1,14 @@
+$engine: 3
+$onesync: on
+name: NODE7 Banking
+version: 2.0.0
+author: NODE7 Development Studios
+description: Personal, society, gang, and shared banking for NODE7 Framework.
+tasks:
+  - action: connect_database
+  - action: query_database
+    file: node7-banking.sql
+  - action: write_file
+    file: ./node7-banking.cfg
+    data: |
+      ensure node7-banking

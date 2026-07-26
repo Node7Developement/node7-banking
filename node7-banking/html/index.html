@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NODE7 Frontier Banking Gazette</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="bank" class="bank hidden" aria-hidden="true">
+    <section class="newspaper" aria-label="NODE7 Frontier Banking Gazette">
+        <header class="masthead">
+            <div class="masthead-side left">
+                <span>ESTABLISHED</span>
+                <strong>1899</strong>
+            </div>
+            <div class="masthead-title">
+                <p>NODE7 LABS PRESENTS</p>
+                <h1>THE FRONTIER BANKING GAZETTE</h1>
+                <div class="masthead-rule"><span id="bankName">Bank Office</span></div>
+            </div>
+            <div class="masthead-side right">
+                <button id="closeButton" class="close-button" type="button" aria-label="Close banking">CLOSE ×</button>
+                <span>ESC TO EXIT</span>
+            </div>
+        </header>
+
+        <section class="account-banner">
+            <div class="identity-stamp">
+                <span>ACCOUNT HOLDER</span>
+                <strong id="characterName">—</strong>
+                <small id="accountNumber">—</small>
+            </div>
+            <article class="balance-card cash-card">
+                <span>CASH ON HAND</span>
+                <strong id="cashBalance">$0.00</strong>
+                <small>Available for deposit</small>
+            </article>
+            <article class="balance-card bank-card">
+                <span>PERSONAL BANK</span>
+                <strong id="bankBalance">$0.00</strong>
+                <small>Protected account funds</small>
+            </article>
+            <article class="balance-card gold-card">
+                <span>GOLD RESERVE</span>
+                <strong id="goldBalance">0.00</strong>
+                <small>Core-held reserve</small>
+            </article>
+        </section>
+
+        <div class="edition-layout">
+            <aside class="edition-rail">
+                <div class="rail-heading">
+                    <span>DAILY EDITION</span>
+                    <strong>BANK DESK</strong>
+                </div>
+
+                <nav class="section-nav" aria-label="Banking sections">
+                    <button class="section-button active" data-tab="cashier" type="button">
+                        <span>01</span><strong>Cashier Desk</strong><small>Deposit & withdraw</small>
+                    </button>
+                    <button class="section-button" data-tab="transfer" type="button">
+                        <span>02</span><strong>Wire Office</strong><small>Personal transfers</small>
+                    </button>
+                    <button class="section-button" data-tab="shared" type="button">
+                        <span>03</span><strong>Company Books</strong><small>Society & shared</small>
+                    </button>
+                    <button class="section-button" data-tab="history" type="button">
+                        <span>04</span><strong>Personal Ledger</strong><small>Account history</small>
+                    </button>
+                </nav>
+
+                <section class="shared-rail">
+                    <div class="rail-section-title">
+                        <strong>ACCOUNT EDITIONS</strong>
+                        <span>Choose a company book</span>
+                    </div>
+                    <div id="sharedAccountList" class="shared-account-list" aria-live="polite"></div>
+                    <p id="sharedRailEmpty" class="rail-empty">No society or shared accounts available.</p>
+                </section>
+
+                <div class="security-seal">
+                    <span>NODE7</span>
+                    <strong>SECURE BANKING</strong>
+                    <small>Core-owned personal balances</small>
+                </div>
+            </aside>
+
+            <section class="edition-content">
+                <section id="cashier" class="page-section active">
+                    <header class="page-heading">
+                        <div>
+                            <p class="kicker">FRONT PAGE · CASHIER SERVICES</p>
+                            <h2>Safeguard Your Frontier Earnings</h2>
+                        </div>
+                        <span class="edition-mark">VOL. VII</span>
+                    </header>
+
+                    <div class="lead-grid">
+                        <article class="lead-story">
+                            <div class="story-number">01</div>
+                            <p class="story-label">DEPOSIT NOTICE</p>
+                            <h3>Move Cash Into Your Protected Account</h3>
+                            <p>Place cash on hand into your personal NODE7 bank balance. Funds remain authoritative through the framework core.</p>
+                            <form id="depositForm" class="bank-form">
+                                <label for="depositAmount">Deposit amount</label>
+                                <div class="amount-line">
+                                    <span>$</span>
+                                    <input id="depositAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                                </div>
+                                <button type="submit">File Deposit</button>
+                            </form>
+                        </article>
+
+                        <article class="lead-story dark-story">
+                            <div class="story-number">02</div>
+                            <p class="story-label">WITHDRAWAL NOTICE</p>
+                            <h3>Collect Funds From Your Personal Account</h3>
+                            <p>Withdraw available bank funds and receive cash on hand. All checks are completed server-side before release.</p>
+                            <form id="withdrawForm" class="bank-form">
+                                <label for="withdrawAmount">Withdrawal amount</label>
+                                <div class="amount-line">
+                                    <span>$</span>
+                                    <input id="withdrawAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                                </div>
+                                <button type="submit">File Withdrawal</button>
+                            </form>
+                        </article>
+                    </div>
+
+                    <div class="news-briefs">
+                        <article><strong>PERSONAL ACCOUNT</strong><span id="cashierAccount">—</span></article>
+                        <article><strong>BRANCH OFFICE</strong><span id="cashierBranch">Bank Office</span></article>
+                        <article><strong>STATUS</strong><span>Verified & available</span></article>
+                    </div>
+                </section>
+
+                <section id="transfer" class="page-section">
+                    <header class="page-heading">
+                        <div>
+                            <p class="kicker">WIRE OFFICE · PERSONAL ACCOUNTS</p>
+                            <h2>Send Funds Across the Territory</h2>
+                        </div>
+                        <span class="edition-mark">WIRE DESK</span>
+                    </header>
+
+                    <div class="transfer-layout">
+                        <article class="feature-copy">
+                            <p class="dropcap">A</p>
+                            <p>uthorize a secure transfer from your personal bank balance to another character account. The recipient may be online or offline, and every movement is recorded in the personal ledger.</p>
+                            <div class="notice-box">
+                                <strong>ACCOUNT NOTICE</strong>
+                                <span>Confirm the recipient account number before filing. Completed transfers cannot be reversed from this desk.</span>
+                            </div>
+                        </article>
+
+                        <form id="transferForm" class="wire-form">
+                            <div class="form-field full-field">
+                                <label for="transferAccount">Recipient account number</label>
+                                <input id="transferAccount" name="account" type="text" maxlength="64" placeholder="Enter account number" required>
+                            </div>
+                            <div class="form-field">
+                                <label for="transferAmount">Transfer amount</label>
+                                <input id="transferAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                            </div>
+                            <div class="form-field">
+                                <label for="transferNote">Reference note</label>
+                                <input id="transferNote" name="note" type="text" maxlength="120" placeholder="Optional reason">
+                            </div>
+                            <button type="submit">Authorize Wire Transfer</button>
+                        </form>
+                    </div>
+                </section>
+
+                <section id="shared" class="page-section shared-page">
+                    <header class="page-heading">
+                        <div>
+                            <p class="kicker">COMPANY BOOKS · SOCIETY & SHARED ACCOUNTS</p>
+                            <h2 id="sharedPageTitle">Select an Account Edition</h2>
+                        </div>
+                        <span id="sharedTypeMark" class="edition-mark">COMPANY DESK</span>
+                    </header>
+
+                    <div id="sharedEmpty" class="shared-empty">
+                        <div class="empty-emblem">N7</div>
+                        <h3>No Company Book Selected</h3>
+                        <p>Choose a society or shared account from the visible account cards on the left.</p>
+                    </div>
+
+                    <div id="sharedWorkspace" class="shared-workspace hidden">
+                        <section class="shared-summary">
+                            <article><span>Account title</span><strong id="sharedLabel">—</strong></article>
+                            <article><span>Account number</span><strong id="sharedNumber">—</strong></article>
+                            <article><span>Your authority</span><strong id="sharedRole">—</strong></article>
+                            <article class="shared-balance"><span>Available balance</span><strong id="sharedBalance">$0.00</strong></article>
+                        </section>
+
+                        <p id="sharedFrozen" class="frozen-notice hidden">ACCOUNT FROZEN — withdrawals and transfers are suspended.</p>
+
+                        <div class="shared-actions">
+                            <form id="sharedDepositForm" class="classified-card">
+                                <p class="classified-label">CLASSIFIED A</p>
+                                <h3>Fund Company Book</h3>
+                                <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+                                <label>Ledger note<input name="note" maxlength="120" placeholder="Optional"></label>
+                                <button type="submit">Deposit From Personal Bank</button>
+                            </form>
+
+                            <form id="sharedWithdrawForm" class="classified-card">
+                                <p class="classified-label">CLASSIFIED B</p>
+                                <h3>Withdraw Company Funds</h3>
+                                <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+                                <label>Ledger note<input name="note" maxlength="120" placeholder="Optional"></label>
+                                <button type="submit">Withdraw To Personal Bank</button>
+                            </form>
+
+                            <form id="sharedTransferForm" class="classified-card wide-classified">
+                                <p class="classified-label">CLASSIFIED C</p>
+                                <h3>Transfer From Company Book</h3>
+                                <div class="two-column-form">
+                                    <label>Target account<input name="target" maxlength="64" placeholder="Personal or N7S account" required></label>
+                                    <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+                                </div>
+                                <label>Ledger note<input name="note" maxlength="120" placeholder="Optional"></label>
+                                <button type="submit">Authorize Company Transfer</button>
+                            </form>
+                        </div>
+
+                        <section id="accountManagement" class="management-section hidden">
+                            <div class="section-divider"><span>ACCOUNT MANAGEMENT</span></div>
+                            <div class="management-grid">
+                                <form id="renameSharedForm" class="management-card">
+                                    <h3>Rename This Account</h3>
+                                    <label>New account title<input name="label" maxlength="48" placeholder="Company account title" required></label>
+                                    <button type="submit">Publish New Title</button>
+                                </form>
+
+                                <form id="memberForm" class="management-card member-form">
+                                    <h3>Add or Update a Member</h3>
+                                    <label>Personal account number<input name="memberAccount" maxlength="64" placeholder="Member account number" required></label>
+                                    <fieldset class="role-choices">
+                                        <legend>Member authority</legend>
+                                        <label><input type="radio" name="role" value="viewer"><span><strong>Viewer</strong><small>Read-only access</small></span></label>
+                                        <label><input type="radio" name="role" value="member" checked><span><strong>Member</strong><small>Standard access</small></span></label>
+                                        <label><input type="radio" name="role" value="manager"><span><strong>Manager</strong><small>Manage members & funds</small></span></label>
+                                    </fieldset>
+                                    <button type="submit">Record Member Authority</button>
+                                </form>
+                            </div>
+
+                            <div class="ledger-table member-ledger">
+                                <div class="table-title"><strong>AUTHORIZED MEMBERS</strong><span>Current company-book access</span></div>
+                                <div class="table-scroll">
+                                    <table>
+                                        <thead><tr><th>Member</th><th>Role</th><th>Access</th><th>Action</th></tr></thead>
+                                        <tbody id="memberBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="ledger-table shared-ledger">
+                            <div class="table-title"><strong>COMPANY ACCOUNT LEDGER</strong><span>Deposits, withdrawals, transfers, and account activity</span></div>
+                            <div class="table-scroll">
+                                <table>
+                                    <thead><tr><th>Type</th><th>Details</th><th>Actor</th><th>Amount</th><th>Balance</th><th>Date</th></tr></thead>
+                                    <tbody id="sharedHistoryBody"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <form id="createSharedForm" class="open-account-notice hidden">
+                        <div>
+                            <p class="kicker">PRIVATE ACCOUNT NOTICE</p>
+                            <h3>Open a New Shared Account</h3>
+                            <p id="creationDetails">Create a private company book for trusted members.</p>
+                        </div>
+                        <label>Account title<input name="label" maxlength="48" placeholder="Ranch, business, posse…" required></label>
+                        <button type="submit">Open Company Book</button>
+                    </form>
+                </section>
+
+                <section id="history" class="page-section">
+                    <header class="page-heading ledger-heading">
+                        <div>
+                            <p class="kicker">PERSONAL LEDGER · RECENT ACCOUNT ACTIVITY</p>
+                            <h2>Your Financial Record</h2>
+                        </div>
+                        <button id="refreshButton" class="refresh-button" type="button">Refresh Ledger</button>
+                    </header>
+
+                    <div class="ledger-table personal-ledger">
+                        <div class="table-title"><strong>PERSONAL ACCOUNT ENTRIES</strong><span>Newest records appear first</span></div>
+                        <div class="table-scroll">
+                            <table>
+                                <thead><tr><th>Type</th><th>Details</th><th>Amount</th><th>Balance</th><th>Date</th></tr></thead>
+                                <tbody id="historyBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </section>
+        </div>
+
+        <footer class="newspaper-footer">
+            <span id="statusText" aria-live="polite">Secure NODE7 banking connection</span>
+            <strong>THE FRONTIER BANKING GAZETTE</strong>
+            <span>NODE7 Development Studios</span>
+        </footer>
+    </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
