@@ -9,8 +9,8 @@ Full-screen personal, society, gang, business, and shared banking for the NODE7 
 <img width="1508" height="1053" alt="drawtextbanking" src="https://github.com/user-attachments/assets/dc5520ad-2b88-49c0-9157-7feab8bfa4f9" />
 
 
+<img width="1915" height="1076" alt="bankingbitch" src="https://github.com/user-attachments/assets/dd4c0963-0d3b-4176-9fca-4ac9104bf7db" />
 
-<img width="1916" height="1080" alt="bankingnode" src="https://github.com/user-attachments/assets/d3d037eb-0d5d-4209-a354-13e41eef17ca" />
 
 ## Version 2.1.0 — Frontier Banking Gazette UI
 
