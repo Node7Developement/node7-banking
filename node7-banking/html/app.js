@@ -18,6 +18,68 @@ const gold = (value) => Number(value || 0).toLocaleString('en-US', {
     maximumFractionDigits: 2,
 });
 
+function parseAmount(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+    const normalized = String(value ?? '')
+        .replace(/[$,\s]/g, '')
+        .trim();
+    if (!normalized) return NaN;
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : NaN;
+}
+
+function availableAmount(key) {
+    if (key === 'cash') return Number(state.data?.cash || 0);
+    if (key === 'bank') return Number(state.data?.bank || 0);
+    if (key === 'shared') return Number(state.data?.sharedAccount?.balance || 0);
+    return 0;
+}
+
+function maximumForForm(form) {
+    if (!form) return Infinity;
+    if (form.id === 'depositForm') return availableAmount('cash');
+    if (form.id === 'withdrawForm' || form.id === 'transferForm' || form.id === 'sharedDepositForm') return availableAmount('bank');
+    if (form.id === 'sharedWithdrawForm' || form.id === 'sharedTransferForm') return availableAmount('shared');
+    return Infinity;
+}
+
+function setAmountError(input, message) {
+    if (!input) return;
+    input.classList.add('input-error');
+    input.setAttribute('aria-invalid', 'true');
+    const feedback = input.closest('form')?.querySelector('.field-feedback');
+    if (feedback) {
+        feedback.textContent = message || 'Enter a valid amount.';
+        feedback.classList.add('error');
+    }
+    input.focus();
+}
+
+function clearAmountError(input) {
+    if (!input) return;
+    input.classList.remove('input-error');
+    input.removeAttribute('aria-invalid');
+    const feedback = input.closest('form')?.querySelector('.field-feedback');
+    if (feedback) {
+        feedback.textContent = '';
+        feedback.classList.remove('error');
+    }
+}
+
+function updateAvailableLabels() {
+    const labels = {
+        depositAvailable: state.data?.cash,
+        withdrawAvailable: state.data?.bank,
+        transferAvailable: state.data?.bank,
+        sharedDepositAvailable: state.data?.bank,
+        sharedWithdrawAvailable: state.data?.sharedAccount?.balance,
+    };
+    Object.entries(labels).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = money(value || 0);
+    });
+}
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
     '&': '&amp;',
     '<': '&lt;',
@@ -232,6 +294,8 @@ function renderSharedAccount(account) {
     document.getElementById('sharedBalance').textContent = money(account.balance);
     document.getElementById('sharedFrozen').classList.toggle('hidden', !account.frozen);
 
+    if (state.data) state.data.sharedAccount = account;
+    updateAvailableLabels();
     applySharedPermissions(account);
     renderMembers(account.members || []);
     renderSharedHistory(account.history || []);
@@ -248,6 +312,7 @@ function render(data) {
     document.getElementById('cashBalance').textContent = money(data.cash);
     document.getElementById('bankBalance').textContent = money(data.bank);
     document.getElementById('goldBalance').textContent = gold(data.gold);
+    updateAvailableLabels();
 
     renderPersonalHistory(data.history || []);
     renderSharedList(data.sharedAccounts || []);
@@ -363,12 +428,35 @@ document.addEventListener('keydown', async (event) => {
 
 async function submit(form, endpoint, payloadBuilder, successStatus) {
     if (state.busy) return;
+
+    // Read FormData before disabling controls. Disabled inputs are excluded by browsers.
+    const payload = payloadBuilder(new FormData(form));
+    const amountInput = form.querySelector('[name="amount"]');
+
+    if (amountInput) {
+        const amount = parseAmount(payload.amount);
+        const maximum = maximumForForm(form);
+        if (!Number.isFinite(amount) || amount < 0.01) {
+            setAmountError(amountInput, 'Enter an amount of at least $0.01.');
+            setStatus('Enter a valid transaction amount.', true);
+            return;
+        }
+        if (Number.isFinite(maximum) && amount > maximum) {
+            setAmountError(amountInput, `Available amount: ${money(maximum)}.`);
+            setStatus(`You only have ${money(maximum)} available for this transaction.`, true);
+            return;
+        }
+        clearAmountError(amountInput);
+        payload.amount = amount;
+    }
+
     setBusy(true);
     try {
-        const response = await post(endpoint, payloadBuilder(new FormData(form)));
+        const response = await post(endpoint, payload);
         if (response && response.data) render(response.data);
         if (response && response.success) {
             form.reset();
+            clearAmountError(amountInput);
             setStatus(successStatus || response.message || 'Transaction completed.');
             if (state.activeTab === 'shared' && state.selectedShared && !response.data?.sharedAccount) {
                 await loadShared(state.selectedShared);
@@ -380,6 +468,12 @@ async function submit(form, endpoint, payloadBuilder, successStatus) {
         setBusy(false);
     }
 }
+
+
+document.querySelectorAll('input[name="amount"]').forEach((input) => {
+    input.addEventListener('input', () => clearAmountError(input));
+    input.addEventListener('wheel', () => input.blur(), { passive: true });
+});
 
 document.getElementById('depositForm').addEventListener('submit', (event) => {
     event.preventDefault();

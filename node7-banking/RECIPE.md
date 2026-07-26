@@ -5,4 +5,4 @@
 3. Merge `recipe/permissions.cfg` once.
 4. Ensure `node7-banking` before dependent job or society resources.
 5. Existing banking tables are migrated automatically.
-6. Version 2.1.0 uses a full-screen newspaper NUI with no dropdown menus.
+6. Version 2.2.1 keeps the full-screen newspaper NUI and restores normal custom amount entry for every transaction.

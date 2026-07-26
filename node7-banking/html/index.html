@@ -102,13 +102,18 @@
                             <p class="story-label">DEPOSIT NOTICE</p>
                             <h3>Move Cash Into Your Protected Account</h3>
                             <p>Place cash on hand into your personal NODE7 bank balance. Funds remain authoritative through the framework core.</p>
-                            <form id="depositForm" class="bank-form">
+                            <form id="depositForm" class="bank-form" novalidate>
+                                <div class="transaction-availability">
+                                    <span>Available cash</span>
+                                    <strong id="depositAvailable">$0.00</strong>
+                                </div>
                                 <label for="depositAmount">Deposit amount</label>
                                 <div class="amount-line">
                                     <span>$</span>
-                                    <input id="depositAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                                    <input id="depositAmount" name="amount" type="text" min="0.01" step="0.01" inputmode="decimal" autocomplete="off" placeholder="0.00" required>
                                 </div>
-                                <button type="submit">File Deposit</button>
+                                <p id="depositFeedback" class="field-feedback" aria-live="polite"></p>
+                                <button class="transaction-submit" type="submit">Confirm Deposit</button>
                             </form>
                         </article>
 
@@ -117,13 +122,18 @@
                             <p class="story-label">WITHDRAWAL NOTICE</p>
                             <h3>Collect Funds From Your Personal Account</h3>
                             <p>Withdraw available bank funds and receive cash on hand. All checks are completed server-side before release.</p>
-                            <form id="withdrawForm" class="bank-form">
+                            <form id="withdrawForm" class="bank-form" novalidate>
+                                <div class="transaction-availability">
+                                    <span>Available in bank</span>
+                                    <strong id="withdrawAvailable">$0.00</strong>
+                                </div>
                                 <label for="withdrawAmount">Withdrawal amount</label>
                                 <div class="amount-line">
                                     <span>$</span>
-                                    <input id="withdrawAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                                    <input id="withdrawAmount" name="amount" type="text" min="0.01" step="0.01" inputmode="decimal" autocomplete="off" placeholder="0.00" required>
                                 </div>
-                                <button type="submit">File Withdrawal</button>
+                                <p id="withdrawFeedback" class="field-feedback" aria-live="polite"></p>
+                                <button class="transaction-submit" type="submit">Confirm Withdrawal</button>
                             </form>
                         </article>
                     </div>
@@ -160,8 +170,13 @@
                                 <input id="transferAccount" name="account" type="text" maxlength="64" placeholder="Enter account number" required>
                             </div>
                             <div class="form-field">
+                                <div class="transaction-availability compact-availability">
+                                    <span>Available</span>
+                                    <strong id="transferAvailable">$0.00</strong>
+                                </div>
                                 <label for="transferAmount">Transfer amount</label>
-                                <input id="transferAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+                                <input id="transferAmount" name="amount" type="text" min="0.01" step="0.01" inputmode="decimal" autocomplete="off" placeholder="0.00" required>
+                                <p class="field-feedback" aria-live="polite"></p>
                             </div>
                             <div class="form-field">
                                 <label for="transferNote">Reference note</label>
@@ -198,18 +213,22 @@
                         <p id="sharedFrozen" class="frozen-notice hidden">ACCOUNT FROZEN — withdrawals and transfers are suspended.</p>
 
                         <div class="shared-actions">
-                            <form id="sharedDepositForm" class="classified-card">
+                            <form id="sharedDepositForm" class="classified-card" novalidate>
                                 <p class="classified-label">CLASSIFIED A</p>
                                 <h3>Fund Company Book</h3>
-                                <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+                                <div class="transaction-availability compact-availability"><span>Personal bank</span><strong id="sharedDepositAvailable">$0.00</strong></div>
+                                <label>Amount<input id="sharedDepositAmount" name="amount" type="text" min="0.01" step="0.01" inputmode="decimal" autocomplete="off" placeholder="0.00" required></label>
+                                <p class="field-feedback" aria-live="polite"></p>
                                 <label>Ledger note<input name="note" maxlength="120" placeholder="Optional"></label>
                                 <button type="submit">Deposit From Personal Bank</button>
                             </form>
 
-                            <form id="sharedWithdrawForm" class="classified-card">
+                            <form id="sharedWithdrawForm" class="classified-card" novalidate>
                                 <p class="classified-label">CLASSIFIED B</p>
                                 <h3>Withdraw Company Funds</h3>
-                                <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+                                <div class="transaction-availability compact-availability"><span>Company balance</span><strong id="sharedWithdrawAvailable">$0.00</strong></div>
+                                <label>Amount<input id="sharedWithdrawAmount" name="amount" type="text" min="0.01" step="0.01" inputmode="decimal" autocomplete="off" placeholder="0.00" required></label>
+                                <p class="field-feedback" aria-live="polite"></p>
                                 <label>Ledger note<input name="note" maxlength="120" placeholder="Optional"></label>
                                 <button type="submit">Withdraw To Personal Bank</button>
                             </form>
@@ -219,8 +238,9 @@
                                 <h3>Transfer From Company Book</h3>
                                 <div class="two-column-form">
                                     <label>Target account<input name="target" maxlength="64" placeholder="Personal or N7S account" required></label>
-                                    <label>Amount<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+                                    <label>Amount<input id="sharedTransferAmount" name="amount" type="text" min="0.01" step="0.01" inputmode="decimal" autocomplete="off" placeholder="0.00" required></label>
                                 </div>
+                                <p class="field-feedback" aria-live="polite"></p>
                                 <label>Ledger note<input name="note" maxlength="120" placeholder="Optional"></label>
                                 <button type="submit">Authorize Company Transfer</button>
                             </form>

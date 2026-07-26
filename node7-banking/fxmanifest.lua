@@ -8,7 +8,7 @@ lua54 'yes'
 name 'node7-banking'
 author 'NODE7 Development Studios'
 description 'Full-screen newspaper personal, society, gang, and shared banking for NODE7 Framework.'
-version '2.1.0'
+version '2.2.1'
 
 ui_page 'html/index.html'
 

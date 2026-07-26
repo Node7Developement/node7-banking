@@ -2,9 +2,16 @@
 
 Full-screen personal, society, gang, business, and shared banking for the NODE7 RedM Framework.
 
-## Version 2.1.0 — Frontier Banking Gazette UI
+## Version 2.2.1 — Custom Amount Fix
 
-This release retains the migration-fixed 2.0.1 banking backend and replaces the interface with a full-screen Red Dead newspaper presentation.
+This release keeps the migration-fixed banking backend and repairs personal/shared amount submission while upgrading the full-screen newspaper cashier experience.
+
+### Reliability fix
+
+- Amount values are captured before UI controls are disabled
+- Fixes deposits and withdrawals incorrectly returning “Enter a valid amount”
+- Server accepts clean numeric values and safely normalizes commas, spaces, and currency symbols
+- Client validates available cash, personal bank funds, and shared-account funds before submission
 
 ### Interface
 
@@ -17,6 +24,9 @@ This release retains the migration-fixed 2.0.1 banking backend and replaces the 
 - Personal cash, bank, and gold displayed across the top
 - Escape key and visible close control
 - Responsive support for narrower resolutions
+- Quick amount buttons and full-balance actions
+- Live available-balance labels on deposit, withdrawal, transfer, and shared-account forms
+- Clear inline validation instead of generic transaction failures
 
 ### Banking
 

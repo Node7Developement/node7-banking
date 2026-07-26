@@ -2,7 +2,7 @@
   "bank_title": "NODE7 FRONTIER BANK",
   "bank_closed": "The bank is closed.",
   "not_near_bank": "You must be at a bank counter.",
-  "invalid_amount": "Enter a valid amount.",
+  "invalid_amount": "Enter a valid amount of $0.01 or more.",
   "insufficient_cash": "You do not have enough cash.",
   "insufficient_bank": "You do not have enough money in your personal bank account.",
   "account_not_found": "That account number was not found.",

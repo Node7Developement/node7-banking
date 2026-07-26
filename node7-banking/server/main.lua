@@ -19,10 +19,27 @@ local function normalizeAccountName(value)
 end
 
 local function validAmount(value, maximum)
-    local amount = tonumber(value)
-    if not amount or amount ~= amount or amount == math.huge or amount == -math.huge then return nil end
+    local amount
+
+    if type(value) == 'number' then
+        amount = value
+    else
+        local normalized = tostring(value or '')
+        normalized = normalized:gsub('%$', ''):gsub(',', ''):gsub('%s+', '')
+        if normalized == '' then return nil end
+        amount = tonumber(normalized)
+    end
+
+    if not amount or amount ~= amount or amount == math.huge or amount == -math.huge then
+        return nil
+    end
+
     amount = roundMoney(amount)
-    if amount < Config.MinimumAmount or amount > maximum then return nil end
+    maximum = tonumber(maximum) or math.huge
+    if amount < (tonumber(Config.MinimumAmount) or 0.01) or amount > maximum then
+        return nil
+    end
+
     return amount
 end
 
