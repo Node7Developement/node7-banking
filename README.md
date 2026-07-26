@@ -3,6 +3,15 @@
 
 Full-screen personal, society, gang, business, and shared banking for the NODE7 RedM Framework.
 
+
+
+
+<img width="1508" height="1053" alt="drawtextbanking" src="https://github.com/user-attachments/assets/dc5520ad-2b88-49c0-9157-7feab8bfa4f9" />
+
+
+
+<img width="1916" height="1080" alt="bankingnode" src="https://github.com/user-attachments/assets/d3d037eb-0d5d-4209-a354-13e41eef17ca" />
+
 ## Version 2.1.0 — Frontier Banking Gazette UI
 
 This release retains the migration-fixed 2.0.1 banking backend and replaces the interface with a full-screen Red Dead newspaper presentation.
