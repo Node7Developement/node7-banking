@@ -7,15 +7,10 @@ lua54 'yes'
 
 name 'node7-banking'
 author 'NODE7 Development Studios'
-description 'Full-screen newspaper personal, society, gang, and shared banking for NODE7 Framework.'
-version '2.2.1'
-
-ui_page 'html/index.html'
+description 'NODE7 personal, society, gang, and shared banking powered exclusively by node7-ui exports.'
+version '2.3.0'
 
 files {
-    'html/index.html',
-    'html/style.css',
-    'html/app.js',
     'locales/*.json'
 }
 
@@ -36,5 +31,6 @@ server_scripts {
 dependencies {
     'ox_lib',
     'oxmysql',
-    'node7-core'
+    'node7-core',
+    'node7-ui'
 }
