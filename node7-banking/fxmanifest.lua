@@ -8,7 +8,7 @@ lua54 'yes'
 name 'node7-banking'
 author 'NODE7 Development Studios'
 description 'NODE7 personal, society, gang, and shared banking powered exclusively by node7-ui exports.'
-version '2.3.0'
+version '2.4.1'
 
 files {
     'locales/*.json'
@@ -32,5 +32,6 @@ dependencies {
     'ox_lib',
     'oxmysql',
     'node7-core',
+    'node7-cashitem',
     'node7-ui'
 }

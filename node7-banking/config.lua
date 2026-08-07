@@ -28,6 +28,27 @@ Config.SharedTransactionHistoryLimit = 40
 Config.RateLimitWindowMs = 1500
 Config.RateLimitMaxActions = 5
 
+
+-- Multi-currency personal vault banking.
+-- Cash continues to use the existing core `bank` account. Every other
+-- supported currency is stored by node7-banking in a per-character vault so
+-- depositing it never duplicates the carried/core/item balance.
+Config.CurrencyBanking = {
+    Enabled = true,
+    CashItemResource = 'node7-cashitem',
+    Currencies = {
+        { key = 'cash', label = 'Canadian Dollars', icon = '$', source = 'cash_exact', decimals = 2, description = '$1, $5, $10, $20, $50, $100 bills plus quarters, dimes, nickels, and pennies.' },
+        { key = 'gold', label = 'Gold Bars', icon = 'G', source = 'cashitem', decimals = 0, description = 'Physical gold bars synchronized by node7-cashitem.' },
+        { key = 'bloodmoney', label = 'Blood Money', icon = 'BM', source = 'core', account = 'bloodmoney', decimals = 2, description = 'Blood money held on your character.' },
+        { key = 'casino_chip', label = 'Casino Chips', icon = 'CC', source = 'core', account = 'casino_chip', decimals = 0, description = 'Casino chips held on your character.' },
+        { key = 'bounty_voucher', label = 'Bounty Vouchers', icon = 'BV', source = 'core', account = 'bounty_voucher', decimals = 0, description = 'Bounty vouchers held on your character.' },
+        { key = 'prison_token', label = 'Prison Tokens', icon = 'PT', source = 'core', account = 'prison_token', decimals = 0, description = 'Prison tokens held on your character.' },
+        { key = 'saloon_token', label = 'Saloon Tokens', icon = 'ST', source = 'core', account = 'saloon_token', decimals = 0, description = 'Saloon tokens held on your character.' },
+        { key = 'outlaw_marks', label = 'Outlaw Marks', icon = 'OM', source = 'cashitem', decimals = 0, description = 'Physical outlaw marks managed by node7-cashitem.' },
+        { key = 'company_scrip', label = 'Company Scrip', icon = 'CS', source = 'cashitem', decimals = 0, description = 'Physical company scrip managed by node7-cashitem.' },
+    },
+}
+
 -- Shared and society banking.
 Config.EnableSharedAccounts = true
 Config.AllowPlayerSharedAccountCreation = true

@@ -10,6 +10,7 @@ local selectedShared = nil
 local currentModule = 'personal'
 local currentScreen = 'overview'
 local actionBusy = false
+local activeCurrencyKey = nil
 local spawnedPeds = {}
 local spawnedBlips = {}
 
@@ -19,6 +20,31 @@ end
 
 local function money(value)
     return ('$%.2f'):format(tonumber(value) or 0)
+end
+
+local function currencyDefinition(key)
+    key = tostring(key or ''):lower()
+    for i = 1, #(((Config.CurrencyBanking or {}).Currencies) or {}) do
+        local definition = Config.CurrencyBanking.Currencies[i]
+        if tostring(definition.key or ''):lower() == key then return definition end
+    end
+    return nil
+end
+
+local function currencyValue(key, value, decimals)
+    key = tostring(key or ''):lower()
+    decimals = tonumber(decimals)
+    if decimals == nil then
+        local definition = currencyDefinition(key)
+        decimals = tonumber(definition and definition.decimals) or 0
+    end
+    if key == 'cash' or key == 'bloodmoney' then
+        return money(value)
+    end
+    if decimals == 0 then
+        return ('%d'):format(math.floor((tonumber(value) or 0) + 0.00001))
+    end
+    return ('%.2f'):format(tonumber(value) or 0)
 end
 
 local function clean(value)
@@ -80,6 +106,7 @@ local function releaseBank()
     currentModule = 'personal'
     currentScreen = 'overview'
     actionBusy = false
+    activeCurrencyKey = nil
 end
 
 local function closeBank(reason)
@@ -93,23 +120,29 @@ end
 local function transactionEntry(entry, shared)
     local amount = tonumber(entry.amount) or 0
     local positive = amount >= 0
+    local currencyKey = shared and 'cash' or clean(entry.currency ~= '' and entry.currency or 'cash'):lower()
+    local definition = currencyDefinition(currencyKey)
+    local formattedAmount = shared and money(amount) or currencyValue(currencyKey, amount, definition and definition.decimals)
+    local formattedBalance = shared and money(entry.balanceAfter) or currencyValue(currencyKey, entry.balanceAfter, definition and definition.decimals)
+    local currencyName = shared and 'Canadian Dollars' or clean((definition and definition.label) or currencyKey)
     return {
         id = ('%s_tx_%s'):format(shared and 'shared' or 'personal', clean(entry.id)),
         entry = clean(entry.description ~= '' and entry.description or entry.type),
         category = clean(entry.type):gsub('_', ' '),
         status = positive and 'Credit' or 'Debit',
-        value = money(amount),
-        balance = money(entry.balanceAfter),
+        value = formattedAmount,
+        balance = formattedBalance,
         counterparty = clean(entry.counterparty or entry.actorName),
         reference = clean(entry.reference),
         createdAt = clean(entry.createdAt),
         label = clean(entry.description ~= '' and entry.description or entry.type),
-        description = ('%s · Balance after %s'):format(clean(entry.createdAt), money(entry.balanceAfter)),
+        description = ('%s · %s · Balance after %s'):format(clean(entry.createdAt), currencyName, formattedBalance),
         badge = positive and 'Credit' or 'Debit',
         type = shared and 'Shared Ledger' or 'Personal Ledger',
         stats = {
-            { label = 'Amount', value = money(amount) },
-            { label = 'Balance After', value = money(entry.balanceAfter) },
+            { label = 'Currency', value = currencyName },
+            { label = 'Amount', value = formattedAmount },
+            { label = 'Balance After', value = formattedBalance },
             { label = 'Counterparty', value = clean(entry.counterparty or entry.actorName or '—') },
             { label = 'Reference', value = clean(entry.reference or '—') },
         },
@@ -169,6 +202,36 @@ local function personalServiceItems(data)
             actions = { { id = 'refresh_bank', label = 'Refresh Banking', style = 'primary' } },
         },
     }
+end
+
+local function currencyVaultItems(data)
+    local items = {}
+    for i = 1, #(data.currencies or {}) do
+        local currency = data.currencies[i]
+        local key = clean(currency.key):lower()
+        local decimals = tonumber(currency.decimals) or 0
+        local physicalNote = key == 'cash' and ' Accepts every physical $1, $5, $10, $20, $50, and $100 bill plus quarters, dimes, nickels, and pennies.' or ''
+        items[#items + 1] = {
+            id = 'currency_' .. key,
+            currencyKey = key,
+            decimals = decimals,
+            label = clean(currency.label),
+            icon = clean(currency.icon),
+            category = 'currency',
+            value = currencyValue(key, currency.banked, decimals),
+            badge = 'Deposited',
+            description = clean(currency.description) .. physicalNote,
+            stats = {
+                { label = 'On Hand', value = currencyValue(key, currency.onHand, decimals) },
+                { label = 'Deposited', value = currencyValue(key, currency.banked, decimals) },
+            },
+            actions = {
+                { id = 'currency_deposit', label = 'Deposit', style = 'primary' },
+                { id = 'currency_withdraw', label = 'Withdraw', style = 'secondary' },
+            },
+        }
+    end
+    return items
 end
 
 local function sharedAccountItems(data)
@@ -305,6 +368,7 @@ local function buildPayload(moduleId, screenId)
     local personalRows = transactionRows(data.history, false)
     local sharedRows = transactionRows(account and account.history or {}, true)
     local sharedAccounts = sharedAccountItems(data)
+    local currencyItems = currencyVaultItems(data)
     local members = memberItems(account)
 
     return {
@@ -360,6 +424,24 @@ local function buildPayload(moduleId, screenId)
                             { id = 'deposit_limit', label = 'Maximum Deposit', value = money(data.limits and data.limits.deposit), badge = 'Limit', description = 'Maximum amount accepted in one deposit.', actions = { { id = 'personal_deposit', label = 'Deposit', style = 'primary' } } },
                             { id = 'transfer_limit', label = 'Maximum Transfer', value = money(data.limits and data.limits.transfer), badge = 'Limit', description = 'Maximum amount sent in one personal transfer.', actions = { { id = 'personal_transfer', label = 'Transfer', style = 'primary' } } },
                         },
+                    },
+                },
+            },
+            {
+                id = 'currencies', label = 'Currency Vault', screens = {
+                    {
+                        id = 'vault', label = 'Currency Vault', title = 'Deposited Currencies',
+                        description = 'Deposit or withdraw physical cash, gold, tokens, vouchers, Outlaw Marks, Company Scrip, and other supported NODE7 currencies.',
+                        view = 'grid', categories = { { id = 'all', label = 'All Currencies' } }, items = currencyItems,
+                    },
+                    {
+                        id = 'currency_ledger', label = 'Currency Ledger', title = 'Currency Transactions',
+                        description = 'Personal ledger entries include the currency used for each deposit or withdrawal.',
+                        view = 'table', categories = { { id = 'all', label = 'All Entries' } },
+                        table = { columns = {
+                            { key = 'entry', label = 'Description' }, { key = 'category', label = 'Type' },
+                            { key = 'status', label = 'Direction' }, { key = 'value', label = 'Amount' },
+                        }, rows = personalRows },
                     },
                 },
             },
@@ -480,6 +562,62 @@ local function showWithdrawModal()
             { id = 'amount', label = 'Withdrawal Amount', type = 'number', min = Config.MinimumAmount, max = Config.MaximumWithdrawal, step = 0.01, required = true, placeholder = '0.00' },
         },
         actions = { { id = 'cancel', label = 'Cancel', validate = false }, { id = 'confirm_withdraw', label = 'Withdraw Funds', style = 'primary' } },
+    })
+end
+
+local function showCurrencyModal(entry, mode)
+    if type(entry) ~= 'table' then return end
+    local key = clean(entry.currencyKey):lower()
+    local currency
+    for i = 1, #((currentData and currentData.currencies) or {}) do
+        if clean(currentData.currencies[i].key):lower() == key then
+            currency = currentData.currencies[i]
+            break
+        end
+    end
+    if not currency then
+        notify('That currency is not available.', 'error')
+        return
+    end
+
+    activeCurrencyKey = key
+    local decimals = tonumber(currency.decimals) or 0
+    local step = decimals == 0 and 1 or 0.01
+    local depositing = mode == 'deposit'
+    local available = depositing and currency.onHand or currency.banked
+    exports[UI_RESOURCE]:ShowModal({
+        id = depositing and 'currency_deposit' or 'currency_withdraw',
+        badge = clean(currency.label),
+        title = (depositing and 'Deposit ' or 'Withdraw ') .. clean(currency.label),
+        message = ('On hand: %s · Deposited: %s.%s'):format(
+            currencyValue(key, currency.onHand, decimals),
+            currencyValue(key, currency.banked, decimals),
+            key == 'cash' and ' Physical bills and coins are handled automatically by node7-cashitem.' or ''
+        ),
+        fields = {
+            {
+                id = 'amount',
+                label = depositing and 'Deposit Amount' or 'Withdrawal Amount',
+                type = 'number',
+                min = decimals == 0 and 1 or Config.MinimumAmount,
+                max = depositing and Config.MaximumDeposit or Config.MaximumWithdrawal,
+                step = step,
+                required = true,
+                placeholder = decimals == 0 and '1' or '0.00',
+            },
+        },
+        summary = {
+            title = clean(currency.label),
+            rows = {
+                { label = 'On Hand', value = currencyValue(key, currency.onHand, decimals) },
+                { label = 'Deposited', value = currencyValue(key, currency.banked, decimals) },
+                { label = 'Available', value = currencyValue(key, available, decimals) },
+            },
+        },
+        actions = {
+            { id = 'cancel', label = 'Cancel', validate = false },
+            { id = depositing and 'confirm_currency_deposit' or 'confirm_currency_withdraw', label = depositing and 'Deposit Currency' or 'Withdraw Currency', style = 'primary' },
+        },
     })
 end
 
@@ -676,6 +814,8 @@ AddEventHandler('node7-ui:client:action', function(data)
     if actionId == 'personal_deposit' then showDepositModal()
     elseif actionId == 'personal_withdraw' then showWithdrawModal()
     elseif actionId == 'personal_transfer' then showTransferModal()
+    elseif actionId == 'currency_deposit' then showCurrencyModal(entry, 'deposit')
+    elseif actionId == 'currency_withdraw' then showCurrencyModal(entry, 'withdraw')
     elseif actionId == 'refresh_bank' then refreshAccount(currentModule, currentScreen)
     elseif actionId == 'view_account_number' then
         exports[UI_RESOURCE]:ShowModal({ id = 'account_number', badge = 'Personal Account', title = 'Account Number', message = clean(currentData.accountNumber), actions = { { id = 'cancel', label = 'Close', validate = false } } })
@@ -710,6 +850,10 @@ AddEventHandler('node7-ui:client:action', function(data)
         applyResponse(awaitCallback('node7-banking:server:deposit', fields.amount), 'personal', 'overview')
     elseif actionId == 'confirm_withdraw' then
         applyResponse(awaitCallback('node7-banking:server:withdraw', fields.amount), 'personal', 'overview')
+    elseif actionId == 'confirm_currency_deposit' then
+        applyResponse(awaitCallback('node7-banking:server:depositCurrency', activeCurrencyKey, fields.amount), 'currencies', 'vault')
+    elseif actionId == 'confirm_currency_withdraw' then
+        applyResponse(awaitCallback('node7-banking:server:withdrawCurrency', activeCurrencyKey, fields.amount), 'currencies', 'vault')
     elseif actionId == 'confirm_transfer' then
         applyResponse(awaitCallback('node7-banking:server:transfer', fields.account, fields.amount, fields.note), 'personal', 'ledger')
     elseif actionId == 'confirm_shared_deposit' then

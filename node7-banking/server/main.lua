@@ -43,6 +43,30 @@ local function validAmount(value, maximum)
     return amount
 end
 
+local function currencyDefinition(key)
+    key = tostring(key or ''):lower()
+    for i = 1, #(((Config.CurrencyBanking or {}).Currencies) or {}) do
+        local definition = Config.CurrencyBanking.Currencies[i]
+        if tostring(definition.key or ''):lower() == key then
+            return definition
+        end
+    end
+    return nil
+end
+
+local function validCurrencyAmount(definition, value, maximum)
+    local amount = validAmount(value, maximum)
+    if not amount then return nil end
+    if tonumber(definition and definition.decimals) == 0 and amount % 1 ~= 0 then
+        return nil
+    end
+    return amount
+end
+
+local function currencyLabel(definition)
+    return tostring((definition and definition.label) or (definition and definition.key) or 'Currency')
+end
+
 local function bool(value)
     return value == true or value == 1 or value == '1'
 end
@@ -109,16 +133,17 @@ local function requireBankPlayer(source, action)
     return Player
 end
 
-local function recordTransaction(citizenid, accountNumber, transactionType, amount, balanceAfter, description, counterparty, reference)
+local function recordTransaction(citizenid, accountNumber, transactionType, amount, balanceAfter, description, counterparty, reference, currency)
     local ok, err = pcall(function()
         MySQL.insert.await([[
             INSERT INTO node7_bank_transactions
-                (citizenid, account_number, transaction_type, amount, balance_after, description, counterparty, reference)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (citizenid, account_number, transaction_type, currency, amount, balance_after, description, counterparty, reference)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ]], {
             citizenid,
             accountNumber or '',
             transactionType,
+            tostring(currency or 'cash'):lower():sub(1, 32),
             roundMoney(amount),
             roundMoney(balanceAfter),
             cleanText(description, 255),
@@ -135,7 +160,7 @@ end
 local function getHistory(citizenid)
     local ok, rows = pcall(function()
         return MySQL.query.await([[
-            SELECT id, transaction_type AS type, amount, balance_after AS balanceAfter,
+            SELECT id, transaction_type AS type, currency, amount, balance_after AS balanceAfter,
                    description, counterparty, reference, created_at AS createdAt
             FROM node7_bank_transactions
             WHERE citizenid = ?
@@ -434,16 +459,235 @@ local function sharedAccountData(Player, name)
     return account
 end
 
+local function getVaultBalances(citizenid)
+    local balances = {}
+    local rows = MySQL.query.await([[
+        SELECT currency, amount
+        FROM node7_bank_currency_balances
+        WHERE citizenid = ?
+    ]], { citizenid }) or {}
+
+    for i = 1, #rows do
+        balances[tostring(rows[i].currency or ''):lower()] = roundMoney(rows[i].amount)
+    end
+    return balances
+end
+
+local function adjustVaultBalance(citizenid, currency, delta)
+    citizenid = tostring(citizenid or '')
+    currency = tostring(currency or ''):lower()
+    delta = roundMoney(delta)
+    if citizenid == '' or currency == '' or delta == 0 then
+        return false, 0
+    end
+
+    if delta > 0 then
+        MySQL.insert.await([[
+            INSERT INTO node7_bank_currency_balances (citizenid, currency, amount)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE amount = amount + VALUES(amount), updated_at = CURRENT_TIMESTAMP
+        ]], { citizenid, currency, delta })
+    else
+        local debit = math.abs(delta)
+        local changed = MySQL.update.await([[
+            UPDATE node7_bank_currency_balances
+            SET amount = amount - ?, updated_at = CURRENT_TIMESTAMP
+            WHERE citizenid = ? AND currency = ? AND amount >= ?
+        ]], { debit, citizenid, currency, debit })
+        if not changed or changed < 1 then
+            return false, getVaultBalances(citizenid)[currency] or 0
+        end
+    end
+
+    local balance = MySQL.scalar.await([[
+        SELECT amount FROM node7_bank_currency_balances
+        WHERE citizenid = ? AND currency = ? LIMIT 1
+    ]], { citizenid, currency })
+    return true, roundMoney(balance or 0)
+end
+
+local function getOnHandCurrency(source, Player, definition)
+    if not definition then return nil, 'invalid_currency' end
+    local key = tostring(definition.key or ''):lower()
+    local sourceType = tostring(definition.source or 'core'):lower()
+
+    if sourceType == 'cash_exact' then
+        local amount, err = exports[(Config.CurrencyBanking or {}).CashItemResource or 'node7-cashitem']:GetCashExact(source)
+        if amount == false then return nil, err end
+        return roundMoney(amount)
+    end
+
+    if sourceType == 'cashitem' then
+        local amount, err = exports[(Config.CurrencyBanking or {}).CashItemResource or 'node7-cashitem']:GetCurrency(source, key)
+        if amount == false then return nil, err end
+        return roundMoney(amount)
+    end
+
+    local account = tostring(definition.account or key)
+    return roundMoney(Player.Functions.GetMoney(account) or 0)
+end
+
+local function removeOnHandCurrency(source, Player, definition, amount, reason)
+    local key = tostring(definition.key or ''):lower()
+    local sourceType = tostring(definition.source or 'core'):lower()
+    local resource = (Config.CurrencyBanking or {}).CashItemResource or 'node7-cashitem'
+
+    if sourceType == 'cash_exact' then
+        local success = exports[resource]:RemoveCashExact(source, amount, reason)
+        return success == true
+    elseif sourceType == 'cashitem' then
+        local success = exports[resource]:RemoveCurrency(source, key, amount, reason)
+        return success == true
+    end
+
+    return Player.Functions.RemoveMoney(tostring(definition.account or key), amount, reason) == true
+end
+
+local function addOnHandCurrency(source, Player, definition, amount, reason)
+    local key = tostring(definition.key or ''):lower()
+    local sourceType = tostring(definition.source or 'core'):lower()
+    local resource = (Config.CurrencyBanking or {}).CashItemResource or 'node7-cashitem'
+
+    if sourceType == 'cash_exact' then
+        local success = exports[resource]:AddCashExact(source, amount, reason)
+        return success == true
+    elseif sourceType == 'cashitem' then
+        local success = exports[resource]:AddCurrency(source, key, amount, reason)
+        return success == true
+    end
+
+    local success = Player.Functions.AddMoney(tostring(definition.account or key), amount, reason)
+    return success == true
+end
+
+local function currencyAccountData(source, Player)
+    if not (Config.CurrencyBanking and Config.CurrencyBanking.Enabled) then return {} end
+
+    local citizenid = tostring(Player.PlayerData.citizenid or '')
+    local vaultBalances = getVaultBalances(citizenid)
+    local output = {}
+
+    for i = 1, #(Config.CurrencyBanking.Currencies or {}) do
+        local definition = Config.CurrencyBanking.Currencies[i]
+        local key = tostring(definition.key or ''):lower()
+        local onHand = getOnHandCurrency(source, Player, definition) or 0
+        local banked = key == 'cash'
+            and roundMoney(Player.Functions.GetMoney('bank') or 0)
+            or roundMoney(vaultBalances[key] or 0)
+
+        output[#output + 1] = {
+            key = key,
+            label = currencyLabel(definition),
+            icon = tostring(definition.icon or key:sub(1, 2):upper()),
+            description = tostring(definition.description or ''),
+            decimals = tonumber(definition.decimals) or 0,
+            onHand = roundMoney(onHand),
+            banked = banked,
+        }
+    end
+
+    return output
+end
+
+local function depositPersonalCurrency(source, Player, definition, amount)
+    local key = tostring(definition.key or ''):lower()
+    local onHand = getOnHandCurrency(source, Player, definition)
+    if onHand == nil or onHand < amount then
+        return false, locale(key == 'cash' and 'insufficient_cash' or 'currency_insufficient_carried')
+    end
+
+    if not removeOnHandCurrency(source, Player, definition, amount, ('bank-%s-deposit'):format(key)) then
+        return false, locale('transaction_failed')
+    end
+
+    local balanceAfter
+    if key == 'cash' then
+        local added, newBalance = Player.Functions.AddMoney('bank', amount, 'bank-deposit')
+        if not added then
+            addOnHandCurrency(source, Player, definition, amount, 'bank-deposit-refund')
+            return false, locale('transaction_failed')
+        end
+        balanceAfter = roundMoney(newBalance or Player.Functions.GetMoney('bank') or 0)
+    else
+        local added, newBalance = adjustVaultBalance(Player.PlayerData.citizenid, key, amount)
+        if not added then
+            addOnHandCurrency(source, Player, definition, amount, ('bank-%s-deposit-refund'):format(key))
+            return false, locale('transaction_failed')
+        end
+        balanceAfter = newBalance
+    end
+
+    local pdata = Player.PlayerData
+    local description = key == 'cash' and 'Physical cash deposit' or (currencyLabel(definition) .. ' deposit')
+    recordTransaction(pdata.citizenid, (pdata.charinfo or {}).account, 'deposit', amount, balanceAfter, description, '', transactionReference(), key)
+    return true, key == 'cash' and locale('deposit_success') or locale('currency_deposit_success')
+end
+
+local function withdrawPersonalCurrency(source, Player, definition, amount)
+    local key = tostring(definition.key or ''):lower()
+    local debit = amount
+    local fee = 0
+    local balanceAfter
+
+    if key == 'cash' then
+        fee = roundMoney(amount * ((tonumber(Config.WithdrawFeePercent) or 0) / 100))
+        debit = roundMoney(amount + fee)
+        if (Player.Functions.GetMoney('bank') or 0) < debit then
+            return false, locale('insufficient_bank')
+        end
+
+        local removed, newBalance = Player.Functions.RemoveMoney('bank', debit, 'bank-withdrawal')
+        if not removed then return false, locale('transaction_failed') end
+        if not addOnHandCurrency(source, Player, definition, amount, 'bank-withdrawal') then
+            Player.Functions.AddMoney('bank', debit, 'bank-withdrawal-refund')
+            return false, locale('transaction_failed')
+        end
+        balanceAfter = roundMoney(newBalance or Player.Functions.GetMoney('bank') or 0)
+    else
+        local current = getVaultBalances(Player.PlayerData.citizenid)[key] or 0
+        if current < amount then return false, locale('currency_insufficient_vault') end
+
+        local removed, newBalance = adjustVaultBalance(Player.PlayerData.citizenid, key, -amount)
+        if not removed then return false, locale('currency_insufficient_vault') end
+        if not addOnHandCurrency(source, Player, definition, amount, ('bank-%s-withdrawal'):format(key)) then
+            adjustVaultBalance(Player.PlayerData.citizenid, key, amount)
+            return false, locale('transaction_failed')
+        end
+        balanceAfter = newBalance
+    end
+
+    local pdata = Player.PlayerData
+    local description
+    if key == 'cash' then
+        description = fee > 0 and ('Physical cash withdrawal (fee $%.2f)'):format(fee) or 'Physical cash withdrawal'
+    else
+        description = currencyLabel(definition) .. ' withdrawal'
+    end
+    recordTransaction(pdata.citizenid, (pdata.charinfo or {}).account, 'withdrawal', -debit, balanceAfter, description, '', transactionReference(), key)
+    return true, key == 'cash' and locale('withdraw_success') or locale('currency_withdraw_success')
+end
+
 local function accountData(Player, selectedShared)
     local pdata = Player.PlayerData
     local charinfo = pdata.charinfo or {}
+    local source = tonumber(pdata.source) or 0
+    local currencies = currencyAccountData(source, Player)
+    local cash = roundMoney(Player.Functions.GetMoney('cash') or 0)
+    local gold = roundMoney(Player.Functions.GetMoney('gold') or 0)
+
+    for i = 1, #currencies do
+        if currencies[i].key == 'cash' then cash = currencies[i].onHand end
+        if currencies[i].key == 'gold' then gold = currencies[i].onHand end
+    end
+
     local data = {
         characterName = characterName(Player),
         citizenid = pdata.citizenid,
         accountNumber = tostring(charinfo.account or ''),
-        cash = roundMoney(Player.Functions.GetMoney('cash') or 0),
+        cash = cash,
         bank = roundMoney(Player.Functions.GetMoney('bank') or 0),
-        gold = roundMoney(Player.Functions.GetMoney('gold') or 0),
+        gold = gold,
+        currencies = currencies,
         history = getHistory(pdata.citizenid),
         sharedAccounts = accessibleSharedAccounts(Player),
         sharedCreation = {
@@ -503,49 +747,69 @@ end)
 lib.callback.register('node7-banking:server:deposit', function(source, rawAmount)
     local Player, failure = requireBankPlayer(source, 'deposit')
     if not Player then return failure end
-    local amount = validAmount(rawAmount, Config.MaximumDeposit)
+    local definition = currencyDefinition('cash')
+    local amount = validCurrencyAmount(definition, rawAmount, Config.MaximumDeposit)
     if not amount then return result(false, locale('invalid_amount')) end
-    if (Player.Functions.GetMoney('cash') or 0) < amount then return result(false, locale('insufficient_cash')) end
 
-    local removed = Player.Functions.RemoveMoney('cash', amount, 'bank-deposit')
-    if not removed then return result(false, locale('transaction_failed')) end
-    local added, bankBalance = Player.Functions.AddMoney('bank', amount, 'bank-deposit')
-    if not added then
-        Player.Functions.AddMoney('cash', amount, 'bank-deposit-refund')
-        return result(false, locale('transaction_failed'))
-    end
+    local success, message = depositPersonalCurrency(source, Player, definition, amount)
+    if not success then return result(false, message) end
 
-    local pdata = Player.PlayerData
-    recordTransaction(pdata.citizenid, (pdata.charinfo or {}).account, 'deposit', amount, bankBalance, 'Cash deposit', '', transactionReference())
     local data = accountData(Player)
     refreshClient(source, Player)
-    return result(true, locale('deposit_success'), data)
+    return result(true, message, data)
 end)
 
 lib.callback.register('node7-banking:server:withdraw', function(source, rawAmount)
     local Player, failure = requireBankPlayer(source, 'withdraw')
     if not Player then return failure end
-    local amount = validAmount(rawAmount, Config.MaximumWithdrawal)
+    local definition = currencyDefinition('cash')
+    local amount = validCurrencyAmount(definition, rawAmount, Config.MaximumWithdrawal)
     if not amount then return result(false, locale('invalid_amount')) end
 
-    local fee = roundMoney(amount * ((tonumber(Config.WithdrawFeePercent) or 0) / 100))
-    local debit = roundMoney(amount + fee)
-    if (Player.Functions.GetMoney('bank') or 0) < debit then return result(false, locale('insufficient_bank')) end
+    local success, message = withdrawPersonalCurrency(source, Player, definition, amount)
+    if not success then return result(false, message) end
 
-    local removed, bankBalance = Player.Functions.RemoveMoney('bank', debit, 'bank-withdrawal')
-    if not removed then return result(false, locale('transaction_failed')) end
-    local added = Player.Functions.AddMoney('cash', amount, 'bank-withdrawal')
-    if not added then
-        Player.Functions.AddMoney('bank', debit, 'bank-withdrawal-refund')
-        return result(false, locale('transaction_failed'))
-    end
-
-    local description = fee > 0 and ('Cash withdrawal (fee $%.2f)'):format(fee) or 'Cash withdrawal'
-    local pdata = Player.PlayerData
-    recordTransaction(pdata.citizenid, (pdata.charinfo or {}).account, 'withdrawal', -debit, bankBalance, description, '', transactionReference())
     local data = accountData(Player)
     refreshClient(source, Player)
-    return result(true, locale('withdraw_success'), data)
+    return result(true, message, data)
+end)
+
+lib.callback.register('node7-banking:server:depositCurrency', function(source, rawCurrency, rawAmount)
+    local Player, failure = requireBankPlayer(source, 'currency_deposit')
+    if not Player then return failure end
+    if not (Config.CurrencyBanking and Config.CurrencyBanking.Enabled) then return result(false, locale('currency_invalid')) end
+
+    local definition = currencyDefinition(rawCurrency)
+    if not definition then return result(false, locale('currency_invalid')) end
+    local amount = validCurrencyAmount(definition, rawAmount, Config.MaximumDeposit)
+    if not amount then
+        return result(false, tonumber(definition.decimals) == 0 and locale('currency_whole_only') or locale('invalid_amount'))
+    end
+
+    local success, message = depositPersonalCurrency(source, Player, definition, amount)
+    if not success then return result(false, message) end
+    local data = accountData(Player)
+    refreshClient(source, Player)
+    return result(true, message, data)
+end)
+
+lib.callback.register('node7-banking:server:withdrawCurrency', function(source, rawCurrency, rawAmount)
+    local Player, failure = requireBankPlayer(source, 'currency_withdraw')
+    if not Player then return failure end
+    if not (Config.CurrencyBanking and Config.CurrencyBanking.Enabled) then return result(false, locale('currency_invalid')) end
+
+    local definition = currencyDefinition(rawCurrency)
+    if not definition then return result(false, locale('currency_invalid')) end
+    local amount = validCurrencyAmount(definition, rawAmount, Config.MaximumWithdrawal)
+    if not amount then
+        return result(false, tonumber(definition.decimals) == 0 and locale('currency_whole_only') or locale('invalid_amount'))
+    end
+
+    local success, message = withdrawPersonalCurrency(source, Player, definition, amount)
+    if not success then return result(false, message) end
+    local data = accountData(Player)
+    refreshClient(source, Player)
+    return result(true, message, data)
 end)
 
 lib.callback.register('node7-banking:server:transfer', function(source, rawAccount, rawAmount, rawNote)
@@ -1057,6 +1321,7 @@ local function migrateSchema()
     ensureColumn('node7_bank_transactions', 'citizenid', "VARCHAR(50) NOT NULL DEFAULT ''")
     ensureColumn('node7_bank_transactions', 'account_number', "VARCHAR(64) NOT NULL DEFAULT ''")
     ensureColumn('node7_bank_transactions', 'transaction_type', "VARCHAR(32) NOT NULL DEFAULT 'unknown'")
+    ensureColumn('node7_bank_transactions', 'currency', "VARCHAR(32) NOT NULL DEFAULT 'cash'")
     ensureColumn('node7_bank_transactions', 'amount', 'DECIMAL(18,2) NOT NULL DEFAULT 0.00')
     ensureColumn('node7_bank_transactions', 'balance_after', 'DECIMAL(18,2) NOT NULL DEFAULT 0.00')
     ensureColumn('node7_bank_transactions', 'description', "VARCHAR(255) NOT NULL DEFAULT ''")
@@ -1066,6 +1331,15 @@ local function migrateSchema()
     ensureIndex('node7_bank_transactions', 'idx_node7_bank_tx_citizenid', '`citizenid`', false)
     ensureIndex('node7_bank_transactions', 'idx_node7_bank_tx_account', '`account_number`', false)
     ensureIndex('node7_bank_transactions', 'idx_node7_bank_tx_reference', '`reference`', false)
+    ensureIndex('node7_bank_transactions', 'idx_node7_bank_tx_currency', '`citizenid`, `currency`', false)
+
+    -- Per-character non-dollar currency vault balances.
+    ensureColumn('node7_bank_currency_balances', 'citizenid', "VARCHAR(50) NOT NULL DEFAULT ''")
+    ensureColumn('node7_bank_currency_balances', 'currency', "VARCHAR(32) NOT NULL DEFAULT ''")
+    ensureColumn('node7_bank_currency_balances', 'amount', 'DECIMAL(18,2) NOT NULL DEFAULT 0.00')
+    ensureColumn('node7_bank_currency_balances', 'created_at', 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP')
+    ensureColumn('node7_bank_currency_balances', 'updated_at', 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+    ensureIndex('node7_bank_currency_balances', 'uq_node7_bank_currency_balance', '`citizenid`, `currency`', true)
 
     -- Society, gang, and player-created shared accounts. Every column is
     -- migrated before any default/job/gang account insert is attempted.
@@ -1146,6 +1420,7 @@ local function createBaseTables()
             citizenid VARCHAR(50) NOT NULL,
             account_number VARCHAR(64) NOT NULL DEFAULT '',
             transaction_type VARCHAR(32) NOT NULL,
+            currency VARCHAR(32) NOT NULL DEFAULT 'cash',
             amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
             balance_after DECIMAL(18,2) NOT NULL DEFAULT 0.00,
             description VARCHAR(255) NOT NULL DEFAULT '',
@@ -1155,7 +1430,19 @@ local function createBaseTables()
             PRIMARY KEY (id),
             KEY idx_node7_bank_tx_citizenid (citizenid),
             KEY idx_node7_bank_tx_account (account_number),
-            KEY idx_node7_bank_tx_reference (reference)
+            KEY idx_node7_bank_tx_reference (reference),
+            KEY idx_node7_bank_tx_currency (citizenid, currency)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ]])
+
+    MySQL.query.await([[
+        CREATE TABLE IF NOT EXISTS node7_bank_currency_balances (
+            citizenid VARCHAR(50) NOT NULL,
+            currency VARCHAR(32) NOT NULL,
+            amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (citizenid, currency)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ]])
 
@@ -1201,6 +1488,7 @@ local function createBaseTables()
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             account_name VARCHAR(64) NOT NULL,
             transaction_type VARCHAR(32) NOT NULL,
+            currency VARCHAR(32) NOT NULL DEFAULT 'cash',
             amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
             balance_after DECIMAL(18,2) NOT NULL DEFAULT 0.00,
             description VARCHAR(255) NOT NULL DEFAULT '',
@@ -1251,5 +1539,5 @@ MySQL.ready(function()
     end
 
     databaseReady = true
-    print('^2[node7-banking]^7 Database ready | schema v2.0.1 | personal banking | society accounts | shared accounts | member permissions | ledgers')
+    print('^2[node7-banking]^7 Database ready | schema v2.4.0 | physical cash bills/coins | multi-currency vault | personal banking | society accounts | shared accounts | ledgers')
 end)

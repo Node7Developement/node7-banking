@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS `node7_bank_transactions` (
   `citizenid` varchar(50) NOT NULL,
   `account_number` varchar(64) NOT NULL DEFAULT '',
   `transaction_type` varchar(32) NOT NULL,
+  `currency` varchar(32) NOT NULL DEFAULT 'cash',
   `amount` decimal(18,2) NOT NULL DEFAULT 0.00,
   `balance_after` decimal(18,2) NOT NULL DEFAULT 0.00,
   `description` varchar(255) NOT NULL DEFAULT '',
@@ -12,7 +13,17 @@ CREATE TABLE IF NOT EXISTS `node7_bank_transactions` (
   PRIMARY KEY (`id`),
   KEY `idx_node7_bank_tx_citizenid` (`citizenid`),
   KEY `idx_node7_bank_tx_account` (`account_number`),
-  KEY `idx_node7_bank_tx_reference` (`reference`)
+  KEY `idx_node7_bank_tx_reference` (`reference`),
+  KEY `idx_node7_bank_tx_currency` (`citizenid`,`currency`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `node7_bank_currency_balances` (
+  `citizenid` varchar(50) NOT NULL,
+  `currency` varchar(32) NOT NULL,
+  `amount` decimal(18,2) NOT NULL DEFAULT 0.00,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`citizenid`,`currency`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `node7_bank_accounts` (
@@ -66,6 +77,18 @@ CREATE TABLE IF NOT EXISTS `node7_bank_account_transactions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Existing installations are migrated automatically by server/main.lua.
+
+-- Multi-currency personal vault migration.
+ALTER TABLE `node7_bank_transactions` ADD COLUMN IF NOT EXISTS `currency` varchar(32) NOT NULL DEFAULT 'cash' AFTER `transaction_type`;
+
+CREATE TABLE IF NOT EXISTS `node7_bank_currency_balances` (
+  `citizenid` varchar(50) NOT NULL,
+  `currency` varchar(32) NOT NULL,
+  `amount` decimal(18,2) NOT NULL DEFAULT 0.00,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`citizenid`,`currency`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Upgrade path for older NODE7 banking account tables.
 ALTER TABLE `node7_bank_accounts` ADD COLUMN IF NOT EXISTS `account_name` varchar(64) NOT NULL DEFAULT '';

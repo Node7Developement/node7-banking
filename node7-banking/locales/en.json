@@ -28,5 +28,11 @@
   "shared_member_not_found": "That member was not found on the account.",
   "shared_members_society_managed": "Job and gang account membership is controlled by the framework job or gang.",
   "shared_owner_immutable": "The account owner cannot be removed or demoted.",
-  "shared_renamed": "Shared account label updated."
+  "shared_renamed": "Shared account label updated.",
+  "currency_invalid": "That currency is not supported by this bank.",
+  "currency_whole_only": "Enter a whole-number amount for that currency.",
+  "currency_insufficient_carried": "You do not have enough of that currency on hand.",
+  "currency_insufficient_vault": "You do not have enough of that currency deposited.",
+  "currency_deposit_success": "Currency deposited successfully.",
+  "currency_withdraw_success": "Currency withdrawn successfully."
 }
